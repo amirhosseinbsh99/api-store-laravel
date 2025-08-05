@@ -8,7 +8,3 @@ Route::get('/', function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class);
 });
-// Example public API route
-Route::get('/ping', function () {
-    return response()->json(['message' => 'pong']);
-});
