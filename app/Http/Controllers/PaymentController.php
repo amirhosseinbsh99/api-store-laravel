@@ -7,29 +7,59 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Zarinpal;
+use App\Models\BasketItem;
 
 class PaymentController extends Controller
 {
-    public function checkout(Request $request)
-    {
-        $response = zarinpal()
-        ->merchantId('00000000-0000-0000-0000-000000000000') // تعیین مرچنت کد در حین اجرا - اختیاری
-        ->amount(100) // مبلغ تراکنش
-        ->request()
-        ->description('transaction info') // توضیحات تراکنش
-        ->callbackUrl('https://domain.com/verification') // آدرس برگشت پس از پرداخت
-        ->mobile('09123456789') // شماره موبایل مشتری - اختیاری
-        ->email('name@domain.com') // ایمیل مشتری - اختیاری
-        ->send();
+    
 
-        if (!$response->success()) {
-            return $response->error()->message();
+    public function checkout(Request $request)
+{
+    $user = $request->user();
+
+    // Get user's basket with items and products
+    $basket = Basket::where('user_id', $user->id)
+        ->with('items.product')
+        ->first();
+
+    if (!$basket || $basket->items->isEmpty()) {
+        return 'Basket is empty or invalid.';
+    }
+
+    // Calculate total considering quantity and discount
+    $totalAmount = $basket->items->sum(function($item) {
+        $price = $item->product->price;
+
+        // Apply discount if exists
+        if ($item->product->discount > 0) {
+            $price = $price - ($price * $item->product->discount / 100);
         }
 
-        // ذخیره اطلاعات تراکنش در دیتابیس
+        return $price * $item->quantity;
+    });
 
-        return $response->redirect();
+    if ($totalAmount <= 0) {
+        return 'Basket is empty or invalid.';
     }
+
+    $response = zarinpal()
+        ->merchantId('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+        ->amount($totalAmount)
+        ->request()
+        ->description('transaction info')
+        ->callbackUrl(route('payment.callback'))
+        ->send();
+
+    if (!$response->success()) {
+        return $response->error()->message();
+    }
+
+    // Save transaction info to DB here
+
+    return $response->redirect();
+}
+
+
 
     public function verify(Request $request)
     {

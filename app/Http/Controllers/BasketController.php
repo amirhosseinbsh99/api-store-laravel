@@ -65,7 +65,20 @@ class BasketController extends Controller
             ->with('items.product')
             ->first();
 
-        return response()->json($basket);
+        if (!$basket) {
+            return response()->json(['message' => 'Basket is empty']);
+        }
+
+        // Calculate total price
+        $totalPrice = $basket->items->sum(function($item) {
+        return $item->product->discounted_price * $item->quantity;
+    });
+
+
+        return response()->json([
+            'basket' => $basket,
+            'total_price' => $totalPrice, // total basket price
+        ]);
     }
 
     public function removeFromBasket(Request $request)
