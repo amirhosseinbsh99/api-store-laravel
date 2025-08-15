@@ -47,29 +47,33 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'phone_number' => 'required|string',
-            'password'     => 'required|string',
+            'password' => 'required|string',
         ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
 
         $user = User::where('phone_number', $request->phone_number)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid phone number or password'], 401);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Generate OTP
+        $code = rand(100000, 999999);
+
+        Otp::create([
+            'phone_number' => $user->phone_number,
+            'code' => $code,
+            'expires_at' => now()->addMinutes(2),
+        ]);
+
+        \Log::info("OTP for {$user->phone_number} is {$code}");
 
         return response()->json([
-            'message' => 'Login successful',
-            'user'    => $user,
-            'token'   => $token
+            'message' => 'OTP sent. Please verify to complete login.'
         ]);
     }
+
 
     /**
      * Get authenticated user
@@ -139,39 +143,6 @@ class AuthController extends Controller
         ]);
     }
 
-
-    public function sendOtp(Request $request)
-    {
-        $request->validate([
-            'phone_number' => 'required|string'
-        ]);
-
-        $phone = $request->phone_number;
-        $cacheKey = "otp_timeout_{$phone}";
-
-        // چک می‌کنیم آیا کاربر کمتر از 2 دقیقه پیش درخواست داده
-        if (Cache::has($cacheKey)) {
-            $secondsLeft = Cache::get($cacheKey) - time();
-            return response()->json([
-                'message' => "Please wait {$secondsLeft} seconds before requesting a new OTP."
-            ], 429); // 429 = Too Many Requests
-        }
-
-        $code = rand(100000, 999999);
-
-        Otp::create([
-            'phone_number' => $phone,
-            'code' => $code,
-            'expires_at' => Carbon::now()->addMinutes(2)
-        ]);
-
-        // ذخیره زمان انقضای درخواست بعدی در کش، برای 2 دقیقه آینده
-        Cache::put($cacheKey, time() + 120, 120); // 120 ثانیه (2 دقیقه)
-
-        \Log::info("OTP for {$phone} is {$code}");
-
-        return response()->json(['message' => 'OTP sent']);
-    }
     public function verifyOtp(Request $request)
     {
         $request->validate([

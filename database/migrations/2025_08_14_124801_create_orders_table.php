@@ -11,8 +11,8 @@ return new class extends Migration {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->decimal('total', 10, 2);
-            $table->string('status')->default('pending'); // pending, paid, canceled
+            $table->decimal('total', 10);
+            $table->string('status')->default('pending');
             $table->timestamps();
         });
 
@@ -21,7 +21,9 @@ return new class extends Migration {
             $table->foreignId('order_id')->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->integer('quantity')->default(1);
-            $table->decimal('price', 10, 2);
+            $table->decimal('price', 10);
+            $table->timestamp('expires_at')->nullable(); // ✅ Add this
+            $table->string('authority')->nullable();
             $table->timestamps();
         });
     }

@@ -23,70 +23,115 @@ class PaymentController extends Controller
             ->first();
 
         if (!$basket || $basket->items->isEmpty()) {
-            return 'Basket is empty or invalid.';
+            return response()->json(['message' => 'Basket is empty or invalid.'], 400);
         }
 
         // Calculate total considering quantity and discount
         $totalAmount = $basket->items->sum(function($item) {
             $price = $item->product->price;
 
-            // Apply discount if exists
             if ($item->product->discount > 0) {
-                $price = $price - ($price * $item->product->discount / 100);
+                $price -= ($price * $item->product->discount / 100);
             }
 
             return $price * $item->quantity;
         });
 
         if ($totalAmount <= 0) {
-            return 'Basket is empty or invalid.';
+            return response()->json(['message' => 'Basket is empty or invalid.'], 400);
         }
 
+        // Send to Zarinpal
         $response = zarinpal()
-            ->merchantId('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+            ->merchantId('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx') // replace your id
             ->amount($totalAmount)
             ->request()
             ->description('transaction info')
-            ->callbackUrl(route('payment.callback'))
+            ->callbackUrl(route('payment.callback')) // callback should hit verify()
             ->send();
 
         if (!$response->success()) {
             return $response->error()->message();
         }
+        
+        // Create Order with status 'pending' and save authority
+        $order = Order::create([
+            'user_id' => $user->id,
+            'total' => $totalAmount,
+            'status' => 'pending',
+            'authority' => $response->authority(), // ✅ Store for verify()
+        ]);
+        
+        // Save order items
+        foreach ($basket->items as $item) {
+            $order->items()->create([
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'price' => $item->product->price,
+            ]);
+        }
 
-        // Save transaction info to DB here
-
-        return $response->redirect();
+        return response()->json([
+            'payment_url' => $response->url(),
+            'total_amount' => $totalAmount,
+            'authority' => $response->authority()
+        ]);
     }
-
 
 
     public function verify(Request $request)
     {
-        $authority = request()->query('Authority'); // دریافت کوئری استرینگ ارسال شده توسط زرین پال
-        $status = request()->query('Status'); // دریافت کوئری استرینگ ارسال شده توسط زرین پال
+        $authority = $request->query('Authority');
+        $status = $request->query('Status');
 
+        // Find the order based on authority
+        $order = Order::where('authority', $authority)->first();
+
+        if (!$order) {
+            return response()->json(['message' => 'Order not found.'], 404);
+        }
+
+        // Check if the order has expired
+        if ($order->expires_at && now()->greaterThan($order->expires_at)) {
+            $order->update(['status' => 'failed']);
+            return response()->json(['message' => 'Payment window expired. Order failed.'], 400);
+        }
+
+        // Optional: If user canceled the payment
+        if ($status !== 'OK') {
+            $order->update(['status' => 'failed']);
+            return response()->json(['message' => 'Payment was canceled.'], 400);
+        }
+
+        $totalAmount = $order->total;
+
+        // Verify with Zarinpal
         $response = zarinpal()
-            ->merchantId('00000000-0000-0000-0000-000000000000') // تعیین مرچنت کد در حین اجرا - اختیاری
-            ->amount(100)
+            ->merchantId('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx') // replace with your merchant ID
+            ->amount($totalAmount)
             ->verification()
             ->authority($authority)
             ->send();
 
         if (!$response->success()) {
+            $order->update(['status' => 'failed']);
             return $response->error()->message();
         }
 
-        // دریافت هش شماره کارتی که مشتری برای پرداخت استفاده کرده است
-        // $response->cardHash();
+        // Update order as paid
+        $order->update([
+            'status' => 'paid',
+            'reference_id' => $response->referenceId()
+        ]);
 
-        // دریافت شماره کارتی که مشتری برای پرداخت استفاده کرده است (بصورت ماسک شده)
-        // $response->cardPan();
-
-        // پرداخت موفقیت آمیز بود
-        // دریافت شماره پیگیری تراکنش و انجام امور مربوط به دیتابیس
-        return $response->referenceId();
+        return response()->json([
+            'message' => 'Payment successful',
+            'reference_id' => $response->referenceId(),
+            'total_amount' => $totalAmount
+        ]);
     }
+
+
 }
 
 

@@ -29,9 +29,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/basket', [BasketController::class, 'viewBasket']);
     Route::delete('/basket/remove', [BasketController::class, 'removeFromBasket']);
     Route::put('/basket/update', [BasketController::class, 'updateBasket']);
-    Route::post('basket/checkout', [PaymentController::class, 'checkout']);
-    Route::get('basket/verify', [PaymentController::class, 'verify']);
+    Route::get('basket/checkout', [PaymentController::class, 'checkout']);
+    Route::get('basket/verify', [PaymentController::class, 'verify'])->name('payment.callback');
 });
+// routes/web.php or api.php
 
 Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function () {
     Route::apiResource('products', ProductAdminController::class);

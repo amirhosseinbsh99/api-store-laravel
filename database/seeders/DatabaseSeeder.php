@@ -19,7 +19,8 @@ class DatabaseSeeder extends Seeder
 
         User::factory()->create([
             'name' => 'Amirhossein',
-            'phone_number' => '0956014932',
+            'phone_number' => '09356014932',
+            'password' => '123456',
             'is_admin' => True
         ]);
         User::factory()->count(5)->create();

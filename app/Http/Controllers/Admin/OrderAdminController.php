@@ -3,47 +3,39 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use Illuminate\Http\Request;
 
 class OrderAdminController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    // List all orders with pagination
     public function index()
     {
-        //
+        return Order::with(['user', 'items.product'])->paginate(10);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    // Show a single order with its items
+    public function show(Order $order)
     {
-        //
+        return $order->load(['user', 'items.product']);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    // Update an order (e.g., status)
+    public function update(Request $request, Order $order)
     {
-        //
+        $data = $request->validate([
+            'status' => 'sometimes|string|in:processing,completed,canceled',
+        ]);
+
+        $order->update($data);
+
+        return response()->json($order);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    // Delete an order
+    public function destroy(Order $order)
     {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $order->delete();
+        return response()->json(['message' => 'Order deleted successfully']);
     }
 }
