@@ -6,6 +6,10 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\BasketController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\Admin\ProductAdminController;
+use App\Http\Controllers\Admin\CategoryAdminController;
+use App\Http\Controllers\Admin\OrderAdminController;
+use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\AuthController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -27,6 +31,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/basket/update', [BasketController::class, 'updateBasket']);
     Route::post('basket/checkout', [PaymentController::class, 'checkout']);
     Route::get('basket/verify', [PaymentController::class, 'verify']);
+});
+
+Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function () {
+    Route::apiResource('products', ProductAdminController::class);
+    Route::apiResource('categories', CategoryAdminController::class);
+    Route::apiResource('orders', OrderAdminController::class)->only(['index', 'show', 'update', 'destroy']);
+    Route::apiResource('users', UserAdminController::class)->only(['index', 'show', 'update', 'destroy']);
 });
 
 Route::middleware('api')->group(function () {

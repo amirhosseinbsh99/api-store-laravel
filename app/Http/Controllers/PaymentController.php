@@ -14,50 +14,50 @@ class PaymentController extends Controller
     
 
     public function checkout(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    // Get user's basket with items and products
-    $basket = Basket::where('user_id', $user->id)
-        ->with('items.product')
-        ->first();
+        // Get user's basket with items and products
+        $basket = Basket::where('user_id', $user->id)
+            ->with('items.product')
+            ->first();
 
-    if (!$basket || $basket->items->isEmpty()) {
-        return 'Basket is empty or invalid.';
-    }
-
-    // Calculate total considering quantity and discount
-    $totalAmount = $basket->items->sum(function($item) {
-        $price = $item->product->price;
-
-        // Apply discount if exists
-        if ($item->product->discount > 0) {
-            $price = $price - ($price * $item->product->discount / 100);
+        if (!$basket || $basket->items->isEmpty()) {
+            return 'Basket is empty or invalid.';
         }
 
-        return $price * $item->quantity;
-    });
+        // Calculate total considering quantity and discount
+        $totalAmount = $basket->items->sum(function($item) {
+            $price = $item->product->price;
 
-    if ($totalAmount <= 0) {
-        return 'Basket is empty or invalid.';
+            // Apply discount if exists
+            if ($item->product->discount > 0) {
+                $price = $price - ($price * $item->product->discount / 100);
+            }
+
+            return $price * $item->quantity;
+        });
+
+        if ($totalAmount <= 0) {
+            return 'Basket is empty or invalid.';
+        }
+
+        $response = zarinpal()
+            ->merchantId('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+            ->amount($totalAmount)
+            ->request()
+            ->description('transaction info')
+            ->callbackUrl(route('payment.callback'))
+            ->send();
+
+        if (!$response->success()) {
+            return $response->error()->message();
+        }
+
+        // Save transaction info to DB here
+
+        return $response->redirect();
     }
-
-    $response = zarinpal()
-        ->merchantId('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
-        ->amount($totalAmount)
-        ->request()
-        ->description('transaction info')
-        ->callbackUrl(route('payment.callback'))
-        ->send();
-
-    if (!$response->success()) {
-        return $response->error()->message();
-    }
-
-    // Save transaction info to DB here
-
-    return $response->redirect();
-}
 
 
 
