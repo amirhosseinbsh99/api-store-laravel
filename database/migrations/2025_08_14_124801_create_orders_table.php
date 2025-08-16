@@ -22,7 +22,7 @@ return new class extends Migration {
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->integer('quantity')->default(1);
             $table->decimal('price', 10);
-            $table->timestamp('expires_at')->nullable(); // ✅ Add this
+            $table->timestamp('expires_at')->nullable(); 
             $table->string('authority')->nullable();
             $table->timestamps();
         });
